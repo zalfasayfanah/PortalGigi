@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #0E7490;
+  --primary-hover: #0c6179;
+  --primary-light: #e0f2fe;
+  --bg-app: #F4F7F9;
+  --panel: #FFFFFF;
+  --text-main: #1F2937;
+  --text-muted: #5A6B78;
+
+  /* Status Colors */
+  --status-menunggu: #F59E0B;
+  --status-dikonfirmasi: #2563EB;
+  --status-hadir: #7C3AED;
+  --status-selesai: #15A66A;
+  --status-dibatalkan: #E53935;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: var(--font-inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular numbers for dates, times, and currencies */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
