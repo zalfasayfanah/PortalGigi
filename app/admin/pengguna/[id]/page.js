@@ -31,12 +31,24 @@ function DetailPenggunaContent() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const reload = () => {
+  const reload = async () => {
     const allUsers = getUsers();
     const target = allUsers.find((u) => u.id === userId);
     if (target) {
       setTargetUser(target);
       setRole(target.role);
+    }
+
+    try {
+      const { fetchUsersFromFirestore } = await import("@/lib/dataStore");
+      const freshUsers = await fetchUsersFromFirestore();
+      const freshTarget = freshUsers?.find((u) => u.id === userId);
+      if (freshTarget) {
+        setTargetUser(freshTarget);
+        setRole(freshTarget.role);
+      }
+    } catch (e) {
+      console.warn("Firestore fetch error:", e);
     }
   };
 
@@ -55,7 +67,7 @@ function DetailPenggunaContent() {
   // PRD 4.13: Bu Ratna tidak bisa menonaktifkan atau menurunkan peran akunnya sendiri
   const isSelf = currentUser?.id === targetUser.id;
 
-  const handleRoleSave = (e) => {
+  const handleRoleSave = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
@@ -65,12 +77,12 @@ function DetailPenggunaContent() {
       return;
     }
 
-    updateUserRole(targetUser.id, role);
-    setMessage(`Peran ${targetUser.nama} berhasil diubah menjadi ${role}.`);
+    await updateUserRole(targetUser.id, role);
+    setMessage(`Peran ${targetUser.nama} berhasil diubah menjadi ${role} dan tersimpan di Firestore.`);
     reload();
   };
 
-  const handleToggleActive = () => {
+  const handleToggleActive = async () => {
     setError("");
     setMessage("");
 
@@ -79,10 +91,10 @@ function DetailPenggunaContent() {
       return;
     }
 
-    toggleUserStatus(targetUser.id);
+    await toggleUserStatus(targetUser.id);
     const updatedStatus = !targetUser.aktif;
     setMessage(
-      `Akun ${targetUser.nama} berhasil ${updatedStatus ? "diaktifkan kembali" : "dinonaktifkan"}.`
+      `Akun ${targetUser.nama} berhasil ${updatedStatus ? "diaktifkan kembali" : "dinonaktifkan"} di Firestore.`
     );
     reload();
   };

@@ -3,12 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  getActiveUser,
-  setActiveUser,
-  getUsers,
-  STATUS_CONFIG,
-} from "@/lib/dataStore";
+import { getActiveUser, STATUS_CONFIG } from "@/lib/dataStore";
 import {
   Calendar,
   Clock,
@@ -21,7 +16,6 @@ import {
   ClipboardList,
   BarChart3,
   LogOut,
-  ChevronDown,
   Menu,
   X,
   Stethoscope,
@@ -29,40 +23,51 @@ import {
   ShieldAlert,
 } from "lucide-react";
 
+import { useAuth } from "@/context/AuthContext";
+
 export default function AppLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [currentUser, setCurrentUserState] = useState(null);
-  const [allUsers, setAllUsers] = useState([]);
+  const { profile, user, loading, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
 
+  const currentUser = profile || getActiveUser();
+
+  // Redirect to login if unauthenticated
   useEffect(() => {
-    const user = getActiveUser();
-    setCurrentUserState(user);
-    setAllUsers(getUsers());
+    if (!loading && !user && !profile) {
+      router.push("/masuk");
+    }
+  }, [loading, user, profile, router]);
 
-    const handleUserChange = () => {
-      setCurrentUserState(getActiveUser());
-      setAllUsers(getUsers());
-    };
+  // Role-based protection: prevent cross-role unauthorized access
+  useEffect(() => {
+    if (!currentUser) return;
+    const path = pathname;
+    const role = currentUser.role;
 
-    window.addEventListener("active_user_changed", handleUserChange);
-    return () => window.removeEventListener("active_user_changed", handleUserChange);
-  }, []);
-
-  const handleSwitchUser = (user) => {
-    setActiveUser(user);
-    setIsRoleDropdownOpen(false);
-    // Redirect to home of the role
-    if (user.role === "pasien") router.push("/beranda");
-    else if (user.role === "resepsionis") router.push("/resepsionis");
-    else if (user.role === "dokter") router.push("/dokter");
-    else if (user.role === "super_admin") router.push("/admin");
-  };
+    if (
+      role === "pasien" &&
+      (path.startsWith("/resepsionis") ||
+        path.startsWith("/dokter") ||
+        path.startsWith("/admin"))
+    ) {
+      router.push("/beranda");
+    } else if (
+      role === "resepsionis" &&
+      (path.startsWith("/dokter") || path.startsWith("/admin"))
+    ) {
+      router.push("/resepsionis");
+    } else if (
+      role === "dokter" &&
+      (path.startsWith("/resepsionis") || path.startsWith("/admin"))
+    ) {
+      router.push("/dokter");
+    }
+  }, [pathname, currentUser, router]);
 
   const handleLogout = () => {
-    router.push("/masuk");
+    logout();
   };
 
   if (!currentUser) {
@@ -162,40 +167,12 @@ export default function AppLayout({ children }) {
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* Role Switcher Demo Bar */}
-            <div className="relative">
-              <button
-                onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition"
-              >
-                <span>Akun: <strong>{currentUser.nama}</strong> ({roleLabels[currentUser.role]})</span>
-                <ChevronDown size={14} />
-              </button>
-
-              {isRoleDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 text-gray-800">
-                  <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
-                    Ganti Akun Demo (4 Peran)
-                  </div>
-                  {allUsers.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => handleSwitchUser(u)}
-                      className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-50 transition ${
-                        u.id === currentUser.id ? "bg-cyan-50 font-semibold text-[#0E7490]" : ""
-                      }`}
-                    >
-                      <div>
-                        <div className="font-medium">{u.nama}</div>
-                        <div className="text-xs text-gray-400">{u.email}</div>
-                      </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${roleColors[u.role]}`}>
-                        {roleLabels[u.role]}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+            {/* Authenticated User Info */}
+            <div className="flex items-center gap-2 bg-white/10 border border-white/20 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm">
+              <span className="font-semibold">{currentUser.nama}</span>
+              <span className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium border ${roleColors[currentUser.role]}`}>
+                {roleLabels[currentUser.role]}
+              </span>
             </div>
 
             <button

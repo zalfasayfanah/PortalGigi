@@ -49,7 +49,7 @@ function RincianJanjiResepsionisContent() {
 
   const todayStr = "2026-10-15";
 
-  const reloadData = () => {
+  const reloadData = async () => {
     if (!janjiId) return;
     const allJanji = getJanjiTemu();
     const apt = allJanji.find((a) => a.id === janjiId);
@@ -59,6 +59,29 @@ function RincianJanjiResepsionisContent() {
       setPatient(allUsers.find((u) => u.id === apt.pasienId));
       setDoctor(allUsers.find((u) => u.id === apt.dokterId));
       setService(getLayanan().find((l) => l.id === apt.layananId));
+    }
+
+    // Also fetch fresh from Cloud Firestore
+    try {
+      const { fetchJanjiFromFirestore, fetchUsersFromFirestore, fetchLayananFromFirestore } = await import("@/lib/dataStore");
+      const [freshJanji, freshUsers, freshLayanan] = await Promise.all([
+        fetchJanjiFromFirestore(),
+        fetchUsersFromFirestore(),
+        fetchLayananFromFirestore(),
+      ]);
+      const freshApt = freshJanji?.find((a) => a.id === janjiId);
+      if (freshApt) {
+        setAppointment(freshApt);
+        if (freshUsers) {
+          setPatient(freshUsers.find((u) => u.id === freshApt.pasienId));
+          setDoctor(freshUsers.find((u) => u.id === freshApt.dokterId));
+        }
+        if (freshLayanan) {
+          setService(freshLayanan.find((l) => l.id === freshApt.layananId));
+        }
+      }
+    } catch (e) {
+      console.warn("Firestore sync in resepsionis detail notice:", e);
     }
   };
 
@@ -117,14 +140,14 @@ function RincianJanjiResepsionisContent() {
     if (!slots.includes(newSlot)) setNewSlot(slots[0] || "");
   }, [isRescheduling, newDate, appointment, service]);
 
-  const handleConfirm = () => {
-    updateJanjiStatus(janjiId, "dikonfirmasi");
-    setMessage("Janji temu telah berhasil dikonfirmasi.");
+  const handleConfirm = async () => {
+    await updateJanjiStatus(janjiId, "dikonfirmasi");
+    setMessage("Janji temu telah berhasil dikonfirmasi dan status tersimpan di Firestore.");
     reloadData();
   };
 
-  const handleMarkArrived = () => {
-    updateJanjiStatus(janjiId, "hadir");
+  const handleMarkArrived = async () => {
+    await updateJanjiStatus(janjiId, "hadir");
     setMessage("Pasien telah ditandai hadir. Janji siap diperiksa di Dasbor Dokter.");
     reloadData();
   };
@@ -254,13 +277,13 @@ function RincianJanjiResepsionisContent() {
                   </button>
                 )}
 
-                {appointment.status === "dikonfirmasi" && isToday && (
+                {appointment.status === "dikonfirmasi" && (
                   <button
                     onClick={handleMarkArrived}
                     className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-sm transition flex items-center gap-1.5"
                   >
                     <CheckCircle2 size={16} />
-                    Tandai Hadir
+                    {isToday ? "Tandai Hadir" : "Tandai Hadir (Walk-in / Uji)"}
                   </button>
                 )}
 

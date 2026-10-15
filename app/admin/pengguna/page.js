@@ -12,6 +12,12 @@ export default function KelolaPenggunaPage() {
 
   useEffect(() => {
     setUsers(getUsers());
+
+    import("@/lib/dataStore").then(({ fetchUsersFromFirestore }) => {
+      fetchUsersFromFirestore().then((freshUsers) => {
+        if (freshUsers) setUsers(freshUsers);
+      });
+    });
   }, []);
 
   const roleLabels = {

@@ -34,20 +34,16 @@ export default function RiwayatPerawatanPage() {
     setDoctors(allUsers.filter((u) => u.role === "dokter"));
     setServices(getLayanan());
 
-    if (user) {
-      const allJanji = getJanjiTemu();
-      const allCatatan = getCatatanPerawatan();
-
-      // Filter appointments that belong to this patient and status is 'selesai'
+    const loadRecords = (janjiList, catatanList, u = user) => {
+      if (!u) return;
       const myCompletedJanji = (
-        user.role === "super_admin"
-          ? allJanji.filter((j) => j.status === "selesai")
-          : allJanji.filter((j) => j.pasienId === user.id && j.status === "selesai")
+        u.role === "super_admin"
+          ? janjiList.filter((j) => j.status === "selesai")
+          : janjiList.filter((j) => j.pasienId === u.id && j.status === "selesai")
       ).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 
-      // Combine with catatan_perawatan
       const combined = myCompletedJanji.map((janji) => {
-        const catatan = allCatatan.find((c) => c.janjiId === janji.id);
+        const catatan = catatanList.find((c) => c.janjiId === janji.id);
         return {
           janji,
           catatan,
@@ -55,7 +51,26 @@ export default function RiwayatPerawatanPage() {
       });
 
       setCompletedRecords(combined);
+    };
+
+    if (user) {
+      loadRecords(getJanjiTemu(), getCatatanPerawatan());
     }
+
+    import("@/lib/dataStore").then(({ fetchJanjiFromFirestore, fetchCatatanFromFirestore, fetchUsersFromFirestore, fetchLayananFromFirestore }) => {
+      Promise.all([
+        fetchJanjiFromFirestore(),
+        fetchCatatanFromFirestore(),
+        fetchUsersFromFirestore(),
+        fetchLayananFromFirestore(),
+      ]).then(([freshJanji, freshCatatan, freshUsers, freshLayanan]) => {
+        if (freshUsers) setDoctors(freshUsers.filter((d) => d.role === "dokter"));
+        if (freshLayanan) setServices(freshLayanan);
+        if (freshJanji && freshCatatan && user) {
+          loadRecords(freshJanji, freshCatatan, user);
+        }
+      });
+    });
   }, []);
 
   const getDoctorName = (id) => {

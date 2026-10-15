@@ -241,11 +241,11 @@ Pakai Firebase MCP. Cari pengguna di Firebase Authentication dengan email \[emai
 
 **Cek hasil:**
 
-☐ Dokumen pemilik berperan super\_admin, tanpa *field* kata sandi.
+☑ Dokumen pemilik berperan super\_admin, tanpa *field* kata sandi.
 
-☐ Keempat peran sudah punya minimal satu akun uji.
+☑ Keempat peran sudah punya minimal satu akun uji.
 
-☐ Hanya Super Admin yang bisa membuka Kelola Pengguna.
+☑ Hanya Super Admin yang bisa membuka Kelola Pengguna.
 
 ## **Tahap 5: Pengalihan dan Route Guard**
 
@@ -318,13 +318,13 @@ Modul lain di PRD menjadi **nilai tambah**. Kerjakan bila alur inti sudah berjal
 
 ## **Yang Dikumpulkan**
 
-☐ Alamat Netlify yang bisa dibuka.
+☑ Alamat Netlify yang bisa dibuka (https://portal-senyum-rekah.netlify.app).
 
-☐ docs/rancangan.md berisi matriks akses, peta route, dan jawaban keputusan.
+☑ docs/rancangan.md berisi matriks akses, peta route, dan jawaban keputusan.
 
-☐ docs/uji.md berisi tabel uji yang sudah dicentang.
+☑ docs/uji.md berisi tabel uji yang sudah dicentang.
 
-☐ Email keempat akun uji.
+☑ Email keempat akun uji.
 
 ## **Kriteria Penilaian**
 

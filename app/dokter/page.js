@@ -30,19 +30,30 @@ export default function DasborDokterPage() {
     setPatients(allUsers.filter((u) => u.role === "pasien"));
     setServices(getLayanan());
 
-    if (user) {
-      const allJanji = getJanjiTemu();
-      // PRD 4.9: Hanya janji dengan dokterId miliknya yang tampil (kecuali super_admin)
+    const loadSchedule = (janjiList, u = user) => {
+      if (!u) return;
       const mySchedule = (
-        user.role === "super_admin"
-          ? allJanji
-          : allJanji.filter((j) => j.dokterId === user.id)
+        u.role === "super_admin"
+          ? janjiList
+          : janjiList.filter((j) => j.dokterId === u.id)
       )
-        .filter((j) => j.tanggal === todayStr)
+        .filter((j) => j.tanggal === todayStr || j.status === "hadir")
         .sort((a, b) => a.jam.localeCompare(b.jam));
 
       setTodaySchedule(mySchedule);
+    };
+
+    if (user) {
+      loadSchedule(getJanjiTemu());
     }
+
+    import("@/lib/dataStore").then(({ fetchJanjiFromFirestore, fetchUsersFromFirestore, fetchLayananFromFirestore }) => {
+      Promise.all([fetchJanjiFromFirestore(), fetchUsersFromFirestore(), fetchLayananFromFirestore()]).then(([freshJanji, freshUsers, freshLayanan]) => {
+        if (freshUsers) setPatients(freshUsers.filter((pat) => pat.role === "pasien"));
+        if (freshLayanan) setServices(freshLayanan);
+        if (freshJanji && user) loadSchedule(freshJanji, user);
+      });
+    });
   }, []);
 
   const getPatientName = (id) => {

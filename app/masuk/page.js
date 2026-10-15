@@ -1,35 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Smile, AlertCircle, ArrowRight, ShieldCheck } from "lucide-react";
-import { getUsers, setActiveUser } from "@/lib/dataStore";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Smile, AlertCircle, ArrowRight } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
-export default function MasukPage() {
+function MasukContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, profile, loginWithEmail, loginWithGoogle } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const redirectByRole = (user) => {
-    if (!user.aktif) {
-      setError("Akun Anda dinonaktifkan. Hubungi klinik.");
-      setLoading(false);
+  const redirectUrl = searchParams?.get("redirect");
+
+  const handleRedirect = (role) => {
+    if (redirectUrl) {
+      router.push(redirectUrl);
       return;
     }
-
-    setActiveUser(user);
-
-    if (user.role === "pasien") router.push("/beranda");
-    else if (user.role === "resepsionis") router.push("/resepsionis");
-    else if (user.role === "dokter") router.push("/dokter");
-    else if (user.role === "super_admin") router.push("/admin");
+    if (role === "pasien") router.push("/beranda");
+    else if (role === "resepsionis") router.push("/resepsionis");
+    else if (role === "dokter") router.push("/dokter");
+    else if (role === "super_admin") router.push("/admin");
     else router.push("/beranda");
   };
 
-  const handleLogin = (e) => {
+  useEffect(() => {
+    if (user && profile?.role) {
+      handleRedirect(profile.role);
+    }
+  }, [user, profile]);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -43,35 +50,48 @@ export default function MasukPage() {
     }
 
     setLoading(true);
-    const users = getUsers();
-    const foundUser = users.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase()
-    );
 
-    if (!foundUser) {
-      setError("Akun tidak ditemukan. Periksa kembali email Anda.");
+    try {
+      const userProfile = await loginWithEmail(email.trim(), password);
+      if (userProfile?.role) {
+        handleRedirect(userProfile.role);
+      }
+    } catch (firebaseErr) {
+      if (
+        firebaseErr.code === "auth/invalid-credential" ||
+        firebaseErr.code === "auth/user-not-found" ||
+        firebaseErr.code === "auth/wrong-password" ||
+        firebaseErr.code === "auth/invalid-email"
+      ) {
+        setError("Email atau kata sandi salah. Silakan periksa kembali.");
+      } else if (firebaseErr.code === "auth/too-many-requests") {
+        setError("Terlalu banyak percobaan gagal. Silakan coba beberapa saat lagi.");
+      } else {
+        setError(`Gagal masuk: ${firebaseErr.message}`);
+      }
       setLoading(false);
-      return;
     }
-
-    redirectByRole(foundUser);
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setLoading(true);
-    const users = getUsers();
-    // Use Andi or create google user
-    const user = users.find((u) => u.email === "andi@gmail.com") || users[4];
-    redirectByRole(user);
-  };
-
-  const handleQuickDemo = (demoUserEmail) => {
-    const users = getUsers();
-    const user = users.find((u) => u.email === demoUserEmail);
-    if (user) {
-      setEmail(user.email);
-      setPassword("password123");
-      redirectByRole(user);
+    setError("");
+    try {
+      const userProfile = await loginWithGoogle();
+      if (userProfile?.role) {
+        handleRedirect(userProfile.role);
+      }
+    } catch (err) {
+      if (
+        err.code === "auth/popup-closed-by-user" ||
+        err.code === "auth/cancelled-popup-request"
+      ) {
+        setError("Masuk dengan Google dibatalkan.");
+      } else {
+        setError(`Gagal masuk dengan Google: ${err.message}`);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -175,48 +195,6 @@ export default function MasukPage() {
             </button>
           </div>
 
-          {/* Quick Demo Access Bar */}
-          <div className="mt-8 pt-6 border-t border-gray-100">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">
-              <ShieldCheck size={14} className="text-[#0E7490]" />
-              <span>Akses Cepat 4 Peran Demo</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => handleQuickDemo("andi@gmail.com")}
-                className="p-2 border border-emerald-200 rounded-lg bg-emerald-50 text-emerald-800 text-left hover:bg-emerald-100 transition"
-              >
-                <div className="font-semibold">Andi (Pasien)</div>
-                <div className="text-[10px] text-emerald-600">andi@gmail.com</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo("laras@senyumrekah.id")}
-                className="p-2 border border-blue-200 rounded-lg bg-blue-50 text-blue-800 text-left hover:bg-blue-100 transition"
-              >
-                <div className="font-semibold">Laras (Resepsionis)</div>
-                <div className="text-[10px] text-blue-600">laras@senyumrekah.id</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo("bima@senyumrekah.id")}
-                className="p-2 border border-purple-200 rounded-lg bg-purple-50 text-purple-800 text-left hover:bg-purple-100 transition"
-              >
-                <div className="font-semibold">drg. Bima (Dokter)</div>
-                <div className="text-[10px] text-purple-600">bima@senyumrekah.id</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo("ratna@senyumrekah.id")}
-                className="p-2 border border-amber-200 rounded-lg bg-amber-50 text-amber-800 text-left hover:bg-amber-100 transition"
-              >
-                <div className="font-semibold">Bu Ratna (Super Admin)</div>
-                <div className="text-[10px] text-amber-600">ratna@senyumrekah.id</div>
-              </button>
-            </div>
-          </div>
-
           <div className="mt-6 text-center text-sm text-gray-500">
             Belum punya akun?{" "}
             <Link
@@ -229,5 +207,19 @@ export default function MasukPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MasukPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F4F7F9]">
+          <div className="w-8 h-8 border-3 border-[#0E7490] border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }
+    >
+      <MasukContent />
+    </Suspense>
   );
 }

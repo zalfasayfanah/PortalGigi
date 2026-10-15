@@ -47,6 +47,7 @@ export default function BuatJanjiPage() {
     const user = getActiveUser();
     setCurrentUser(user);
 
+    // Initial sync from local storage
     const allLayanan = getLayanan().filter((l) => l.aktif);
     setActiveServices(allLayanan);
     if (allLayanan.length > 0) setSelectedServiceId(allLayanan[0].id);
@@ -65,6 +66,19 @@ export default function BuatJanjiPage() {
     const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
     const dd = String(tomorrow.getDate()).padStart(2, "0");
     setSelectedDate(`${yyyy}-${mm}-${dd}`);
+
+    // Asynchronously fetch latest data from Cloud Firestore
+    Promise.all([
+      import("@/lib/dataStore").then((m) => m.fetchLayananFromFirestore()),
+      import("@/lib/dataStore").then((m) => m.fetchUsersFromFirestore()),
+      import("@/lib/dataStore").then((m) => m.fetchJadwalFromFirestore()),
+      import("@/lib/dataStore").then((m) => m.fetchSlotsFromFirestore()),
+    ]).then(([latestLayanan, latestUsers, latestJadwal, latestSlots]) => {
+      if (latestLayanan) setActiveServices(latestLayanan.filter((l) => l.aktif));
+      if (latestUsers) setDoctors(latestUsers.filter((u) => u.role === "dokter" && u.aktif));
+      if (latestJadwal) setSchedules(latestJadwal);
+      if (latestSlots) setFilledSlots(latestSlots);
+    }).catch((err) => console.warn("Firestore sync notice:", err));
   }, []);
 
   // Calculate day name in Indonesian
@@ -138,7 +152,7 @@ export default function BuatJanjiPage() {
     }
   }, [selectedDoctorId, selectedDate, selectedServiceId, schedules, filledSlots]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -187,20 +201,24 @@ export default function BuatJanjiPage() {
       return;
     }
 
-    const newJanji = addJanjiTemu({
-      pasienId: currentUser.id,
-      dokterId: selectedDoctorId,
-      layananId: selectedServiceId,
-      tanggal: selectedDate,
-      jam: selectedSlot,
-      keluhan: keluhan.trim(),
-      durasiMenit: service?.durasiMenit || 30,
-    });
+    try {
+      const newJanji = await addJanjiTemu({
+        pasienId: currentUser.id,
+        dokterId: selectedDoctorId,
+        layananId: selectedServiceId,
+        tanggal: selectedDate,
+        jam: selectedSlot,
+        keluhan: keluhan.trim(),
+        durasiMenit: service?.durasiMenit || 30,
+      });
 
-    setTimeout(() => {
       setLoading(false);
       router.push(`/janji/${newJanji.id}`);
-    }, 400);
+    } catch (err) {
+      console.error("Gagal membuat janji:", err);
+      setError("Gagal menyimpan janji temu ke Firestore. Silakan coba lagi.");
+      setLoading(false);
+    }
   };
 
   const selectedService = activeServices.find((s) => s.id === selectedServiceId);

@@ -4,10 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Smile, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { getUsers, setStoredData, setActiveUser } from "@/lib/dataStore";
 
 export default function DaftarPage() {
   const router = useRouter();
+  const { registerWithEmail, loginWithGoogle } = useAuth();
+
   const [formData, setFormData] = useState({
     nama: "",
     email: "",
@@ -17,7 +20,7 @@ export default function DaftarPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -40,55 +43,39 @@ export default function DaftarPage() {
 
     setLoading(true);
 
-    const users = getUsers();
-    const existing = users.find(
-      (u) => u.email.toLowerCase() === formData.email.trim().toLowerCase()
-    );
-
-    if (existing) {
-      setError("Email ini sudah terdaftar. Silakan gunakan email lain atau masuk.");
-      setLoading(false);
-      return;
-    }
-
-    const newUser = {
-      id: `user_${Date.now()}`,
-      nama: formData.nama.trim(),
-      email: formData.email.trim(),
-      noHp: formData.noHp.trim(),
-      role: "pasien",
-      aktif: true,
-      dibuatPada: new Date().toISOString(),
-    };
-
-    setStoredData("senyum_users", [...users, newUser]);
-    setActiveUser(newUser);
-
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Register with Firebase Auth + creates users/{uid} document with role 'pasien' (PRD 2.2 & Tahap 3)
+      await registerWithEmail(
+        formData.email.trim(),
+        formData.password,
+        formData.nama.trim(),
+        formData.noHp.trim()
+      );
       router.push("/beranda");
-    }, 400);
+    } catch (err) {
+      if (err.code === "auth/email-already-in-use") {
+        setError("Email ini sudah terdaftar. Silakan gunakan email lain atau masuk.");
+      } else {
+        setError(err.message || "Gagal mendaftar. Silakan coba lagi.");
+      }
+      setLoading(false);
+    }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setLoading(true);
-    const users = getUsers();
-    const googleUser = {
-      id: `google_${Date.now()}`,
-      nama: "Pengguna Google",
-      email: "google.user@gmail.com",
-      noHp: "",
-      role: "pasien",
-      aktif: true,
-      dibuatPada: new Date().toISOString(),
-    };
-    setStoredData("senyum_users", [...users, googleUser]);
-    setActiveUser(googleUser);
-
-    setTimeout(() => {
-      setLoading(false);
+    setError("");
+    try {
+      await loginWithGoogle();
       router.push("/beranda");
-    }, 400);
+    } catch (err) {
+      if (err.code === "auth/popup-closed-by-user") {
+        setError("Pendaftaran dengan Google dibatalkan.");
+      } else {
+        setError("Gagal mendaftar dengan Google: " + err.message);
+      }
+      setLoading(false);
+    }
   };
 
   return (
@@ -98,7 +85,7 @@ export default function DaftarPage() {
           <Smile size={32} />
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-gray-900">
-          Daftar Akun Baru
+          Daftar Akun Pasien Baru
         </h2>
         <p className="mt-1 text-sm text-gray-500">
           Portal Janji Temu Klinik Gigi Senyum Rekah

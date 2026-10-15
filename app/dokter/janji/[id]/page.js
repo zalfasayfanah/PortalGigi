@@ -48,35 +48,49 @@ function PemeriksaanDokterContent() {
     setCurrentUser(user);
 
     if (janjiId) {
-      const allJanji = getJanjiTemu();
-      const apt = allJanji.find((a) => a.id === janjiId);
+      const loadData = (allJanji, allUsers, allLayanan, allCatatan) => {
+        const apt = allJanji.find((a) => a.id === janjiId);
 
-      // Security check: Only this doctor or super_admin can open (PRD 4.10)
-      if (
-        !apt ||
-        (user && user.role !== "super_admin" && apt.dokterId !== user.id)
-      ) {
-        setNotFound(true);
-        return;
-      }
+        // Security check: Only this doctor or super_admin can open (PRD 4.10)
+        if (
+          !apt ||
+          (user && user.role !== "super_admin" && apt.dokterId !== user.id)
+        ) {
+          setNotFound(true);
+          return;
+        }
 
-      setAppointment(apt);
+        setNotFound(false);
+        setAppointment(apt);
+        setPatient(allUsers.find((u) => u.id === apt.pasienId));
+        setService(allLayanan.find((l) => l.id === apt.layananId));
 
-      const allUsers = getUsers();
-      setPatient(allUsers.find((u) => u.id === apt.pasienId));
-      setService(getLayanan().find((l) => l.id === apt.layananId));
+        const existing = allCatatan.find((c) => c.janjiId === apt.id);
+        if (existing) {
+          setExistingCatatan(existing);
+          setTindakan(existing.tindakan);
+          setCatatan(existing.catatan);
+        }
+      };
 
-      const allCatatan = getCatatanPerawatan();
-      const existing = allCatatan.find((c) => c.janjiId === apt.id);
-      if (existing) {
-        setExistingCatatan(existing);
-        setTindakan(existing.tindakan);
-        setCatatan(existing.catatan);
-      }
+      loadData(getJanjiTemu(), getUsers(), getLayanan(), getCatatanPerawatan());
+
+      import("@/lib/dataStore").then(({ fetchJanjiFromFirestore, fetchUsersFromFirestore, fetchLayananFromFirestore, fetchCatatanFromFirestore }) => {
+        Promise.all([
+          fetchJanjiFromFirestore(),
+          fetchUsersFromFirestore(),
+          fetchLayananFromFirestore(),
+          fetchCatatanFromFirestore(),
+        ]).then(([freshJanji, freshUsers, freshLayanan, freshCatatan]) => {
+          if (freshJanji && freshUsers && freshLayanan && freshCatatan) {
+            loadData(freshJanji, freshUsers, freshLayanan, freshCatatan);
+          }
+        });
+      });
     }
   }, [janjiId]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -91,19 +105,25 @@ function PemeriksaanDokterContent() {
 
     setLoading(true);
 
-    const savedCatatan = addCatatanPerawatan({
-      janjiId: appointment.id,
-      pasienId: appointment.pasienId,
-      dokterId: appointment.dokterId,
-      tindakan: tindakan.trim(),
-      catatan: catatan.trim(),
-    });
+    try {
+      const savedCatatan = await addCatatanPerawatan({
+        janjiId: appointment.id,
+        pasienId: appointment.pasienId,
+        dokterId: appointment.dokterId,
+        tindakan: tindakan.trim(),
+        catatan: catatan.trim(),
+      });
 
-    updateJanjiStatus(appointment.id, "selesai");
-    setExistingCatatan(savedCatatan);
-    setAppointment((prev) => ({ ...prev, status: "selesai" }));
-    setSuccess(true);
-    setLoading(false);
+      await updateJanjiStatus(appointment.id, "selesai");
+      setExistingCatatan(savedCatatan);
+      setAppointment((prev) => ({ ...prev, status: "selesai" }));
+      setSuccess(true);
+    } catch (err) {
+      console.error("Gagal menyimpan catatan medis ke Firestore:", err);
+      setError("Gagal menyimpan catatan pemeriksaan ke Firestore.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (notFound) {

@@ -20,17 +20,25 @@ export default function DaftarJanjiPage() {
     setDoctors(getUsers().filter((u) => u.role === "dokter"));
     setServices(getLayanan());
 
-    if (user) {
-      const all = getJanjiTemu();
-      // Filter for this patient if not super_admin
-      const list = user.role === "super_admin"
+    const loadData = (all) => {
+      const list = user?.role === "super_admin"
         ? all
-        : all.filter((a) => a.pasienId === user.id);
-
-      // Sort by date nearest
+        : all.filter((a) => a.pasienId === user?.id);
       list.sort((a, b) => new Date(`${a.tanggal}T${a.jam}`) - new Date(`${b.tanggal}T${b.jam}`));
       setAppointments(list);
+    };
+
+    if (user) {
+      loadData(getJanjiTemu());
     }
+
+    import("@/lib/dataStore").then(({ fetchJanjiFromFirestore, fetchUsersFromFirestore, fetchLayananFromFirestore }) => {
+      Promise.all([fetchJanjiFromFirestore(), fetchUsersFromFirestore(), fetchLayananFromFirestore()]).then(([freshJanji, freshUsers, freshLayanan]) => {
+        if (freshUsers) setDoctors(freshUsers.filter((u) => u.role === "dokter"));
+        if (freshLayanan) setServices(freshLayanan);
+        if (freshJanji && user) loadData(freshJanji);
+      });
+    });
   }, []);
 
   const getDoctorName = (id) => {
